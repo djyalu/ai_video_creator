@@ -23,13 +23,17 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies in multiple steps for better error handling
-# Step 1: Ensure pip, setuptools, and wheel are up to date
+# Install Python dependencies with better compatibility
+# Step 1: Upgrade pip and install build tools
 RUN python -m pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir --upgrade setuptools wheel
 
-# Step 2: Install requirements
-RUN pip install --no-cache-dir -r requirements.txt
+# Step 2: Install core build dependencies separately to avoid conflicts
+RUN pip install --no-cache-dir "setuptools>=65.0.0" "wheel>=0.37.0" "packaging>=21.0"
+
+# Step 3: Install requirements with retry mechanism
+RUN pip install --no-cache-dir --timeout=300 -r requirements.txt || \
+    (pip install --no-cache-dir --force-reinstall --no-deps setuptools && \
+     pip install --no-cache-dir -r requirements.txt)
 
 # Verify critical dependencies are installed
 RUN python -c "import psycopg2; import redis; import celery; print('✓ All critical dependencies installed')"
