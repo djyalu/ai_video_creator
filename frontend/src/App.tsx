@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('text-to-video');
   const [healthStatus, setHealthStatus] = useState<'checking' | 'healthy' | 'unhealthy'>('checking');
   
-  const { activeJobs, jobs } = useVideoStore();
+  const { jobs } = useVideoStore();
 
   // Check backend health on app start
   useEffect(() => {

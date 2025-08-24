@@ -1,5 +1,5 @@
 import React from 'react';
-import { Type, Image, Clock, Settings } from 'lucide-react';
+import { Type, Image, Clock } from 'lucide-react';
 
 interface TabNavigationProps {
   activeTab: string;
