@@ -1,101 +1,73 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: ai_video_db
-    environment:
-      POSTGRES_USER: aiuser
-      POSTGRES_PASSWORD: aipass123
-      POSTGRES_DB: ai_video_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - ai_video_network
-
-  # Redis for Celery
-  redis:
-    image: redis:7-alpine
-    container_name: ai_video_redis
-    ports:
-      - "6379:6379"
-    networks:
-      - ai_video_network
-
-  # FastAPI Application
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_video_api
-    environment:
-      - DATABASE_URL=postgresql://aiuser:aipass123@postgres:5432/ai_video_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-    env_file:
-      - .env
+    build: .
     ports:
       - "8000:8000"
-    volumes:
-      - ./uploads:/app/uploads
-      - ./outputs:/app/outputs
-      - ./temp:/app/temp
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - ai_video_network
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  # Celery Worker
-  celery:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_video_celery
     environment:
-      - DATABASE_URL=postgresql://aiuser:aipass123@postgres:5432/ai_video_db
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql://postgres:password@db:5432/ai_video_creator
       - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
     env_file:
       - .env
     volumes:
+      - ./app:/app/app  # Hot reload for development
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
-      - ./temp:/app/temp
     depends_on:
-      - postgres
+      - db
       - redis
-    networks:
-      - ai_video_network
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Flower - Celery Monitoring (Optional)
-  flower:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: ai_video_flower
+  worker:
+    build: .
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:password@db:5432/ai_video_creator
+      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.worker worker --loglevel=info
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=ai_video_creator
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  # Optional: Flower for monitoring Celery tasks
+  flower:
+    build: .
     ports:
       - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
     depends_on:
       - redis
-      - celery
-    networks:
-      - ai_video_network
-    command: celery -A app.tasks.celery_app flower --port=5555
-
-networks:
-  ai_video_network:
-    driver: bridge
+    command: celery -A app.worker flower
 
 volumes:
   postgres_data:
+  redis_data:
