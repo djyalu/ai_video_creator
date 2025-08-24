@@ -104,9 +104,13 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: 📥 Checkout code
@@ -134,13 +138,14 @@ jobs:
     - name: 📄 Setup GitHub Pages
       uses: actions/configure-pages@v4
 
-    - name: 🚀 Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
+    - name: 📦 Upload GitHub Pages artifact
+      uses: actions/upload-pages-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./frontend/dist
-        publish_branch: gh-pages
-        force_orphan: true
+        path: ./frontend/dist
+
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
 
   lighthouse:
     name: 🏠 Lighthouse Performance Audit
