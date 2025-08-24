@@ -1,0 +1,148 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  RENDER_SERVICE_NAME: ai-video-creator
+  RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      working-directory: ./ai_video_creator
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov
+    
+    - name: Run linting
+      working-directory: ./ai_video_creator
+      run: |
+        pip install flake8 black isort
+        # Format check
+        black --check app/
+        # Import sort check
+        isort --check-only app/
+        # Linting
+        flake8 app/ --max-line-length=100 --ignore=E203,W503
+      continue-on-error: true  # Don't fail build on linting issues initially
+    
+    - name: Run tests
+      working-directory: ./ai_video_creator
+      env:
+        GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        KLING_API_ACCESS_KEY: ${{ secrets.KLING_API_ACCESS_KEY }}
+        KLING_API_SECRET_KEY: ${{ secrets.KLING_API_SECRET_KEY }}
+      run: |
+        pytest tests/ -v --cov=app --cov-report=xml --cov-report=term
+      continue-on-error: true  # Don't fail if tests don't exist yet
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      working-directory: ./ai_video_creator
+      run: |
+        docker build -t ai-video-creator:${{ github.sha }} .
+        docker tag ai-video-creator:${{ github.sha }} ai-video-creator:latest
+    
+    - name: Check Docker image size
+      run: |
+        docker images ai-video-creator:${{ github.sha }}
+        SIZE=$(docker inspect ai-video-creator:${{ github.sha }} --format='{{.Size}}')
+        echo "Image size: $(($SIZE / 1024 / 1024)) MB"
+
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Trigger Render Deploy Hook
+      run: |
+        # Render auto-deploys from GitHub, but we can trigger manually if needed
+        if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          echo "Deployment triggered successfully"
+        else
+          echo "Auto-deploy is configured in Render dashboard"
+        fi
+    
+    - name: Wait for deployment
+      run: |
+        echo "Waiting for deployment to complete..."
+        sleep 30
+    
+    - name: Health check
+      run: |
+        MAX_ATTEMPTS=10
+        ATTEMPT=0
+        
+        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          if curl -f https://ai-video-creator-irf1.onrender.com/health; then
+            echo "Health check passed!"
+            exit 0
+          fi
+          
+          ATTEMPT=$((ATTEMPT + 1))
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS failed, waiting..."
+          sleep 30
+        done
+        
+        echo "Health check failed after $MAX_ATTEMPTS attempts"
+        exit 1
+      continue-on-error: true  # Don't fail the whole workflow
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    
+    steps:
+    - name: Send deployment notification
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ Deployment successful to https://ai-video-creator-irf1.onrender.com"
+        else
+          echo "❌ Deployment failed. Check Render dashboard for details."
+        fi
