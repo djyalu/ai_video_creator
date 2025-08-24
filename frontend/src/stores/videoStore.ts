@@ -57,7 +57,7 @@ const defaultImageForm: ImageToVideoForm = {
 // Generate a demo user ID
 const generateUserId = () => `demo_user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-const pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+const pollingIntervals: Map<string, number> = new Map();
 
 export const useVideoStore = create<VideoStore>((set, get) => ({
   // Initial state
@@ -201,7 +201,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
     }
 
     // Start new polling interval
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       get().refreshJobStatus(jobId);
     }, 5000); // Poll every 5 seconds
 
@@ -210,7 +210,7 @@ export const useVideoStore = create<VideoStore>((set, get) => ({
 
   stopJobPolling: (jobId) => {
     if (pollingIntervals.has(jobId)) {
-      clearInterval(pollingIntervals.get(jobId)!);
+      window.clearInterval(pollingIntervals.get(jobId)!);
       pollingIntervals.delete(jobId);
     }
   },
