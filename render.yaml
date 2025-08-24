@@ -12,8 +12,8 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-      python -c "from app.database import init_db; import asyncio; asyncio.run(init_db())"
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+      chmod +x start.sh
+    startCommand: ./start.sh
     
     # Environment Variables
     envVars:
@@ -84,8 +84,8 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-      pip install celery[redis]
-    startCommand: celery -A app.worker worker --loglevel=info --concurrency=2
+      pip install celery[redis] flower
+    startCommand: celery -A app.worker worker --loglevel=info --concurrency=2 --max-tasks-per-child=1000
     
     # Shared Environment Variables
     envVars:

@@ -9,9 +9,14 @@ from .core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Create SQLAlchemy engine
-engine = create_engine(settings.DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Create SQLAlchemy engine with error handling
+try:
+    engine = create_engine(settings.DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    logger.info(f"Database engine created for: {settings.DATABASE_URL}")
+except Exception as e:
+    logger.error(f"Failed to create database engine: {e}")
+    raise
 
 # Create declarative base
 Base = declarative_base()
