@@ -76,5 +76,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health')" || exit 1
 
-# Start minimal application for testing
-CMD ["sh", "-c", "uvicorn app.minimal_main:app --host 0.0.0.0 --port $PORT --workers 1"]
+# Start ultra-simple application
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
