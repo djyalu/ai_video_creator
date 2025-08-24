@@ -8,9 +8,9 @@ from contextlib import asynccontextmanager
 import logging
 import uvicorn
 
-from app.api.endpoints import video, status, health
-from app.core.config import settings
-from app.database import init_db
+from .api.endpoints import video, status, health
+from .core.config import settings
+from .database import init_db
 
 # Configure logging
 logging.basicConfig(
