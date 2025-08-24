@@ -1,7 +1,7 @@
 """
 Application configuration using Pydantic Settings
 """
-from typing import Optional
+from typing import Optional, List
 from pydantic_settings import BaseSettings
 from pydantic import Field
 import os
@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     UPLOAD_DIR: Path = Field(default=Path("./uploads"))
     OUTPUT_DIR: Path = Field(default=Path("./outputs"))
     MAX_UPLOAD_SIZE: int = Field(default=104857600)  # 100MB
+    
+    # File Validation
+    ALLOWED_IMAGE_TYPES: List[str] = Field(
+        default=[".jpg", ".jpeg", ".png", ".webp", ".gif"]
+    )
+    ALLOWED_VIDEO_TYPES: List[str] = Field(
+        default=[".mp4", ".avi", ".mov", ".webm"]
+    )
     
     # API Settings
     API_HOST: str = Field(default="0.0.0.0")

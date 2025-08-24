@@ -1,50 +1,93 @@
+# Render.com deployment configuration
+# Optimized for GitHub Actions + automatic deployment
+
 services:
-  # Web Service - FastAPI Application
+  # Main API Service - Production Ready
   - type: web
-    name: ai-video-creator
-    runtime: docker
+    name: ai-video-creator-api
+    runtime: python3
     repo: https://github.com/djyalu/ai_video_creator
     branch: main
-    dockerfilePath: ./ai_video_creator/Dockerfile
-    dockerContext: ./ai_video_creator
+    rootDir: ai_video_creator
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -c "from app.database import init_db; import asyncio; asyncio.run(init_db())"
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    
+    # Environment Variables
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
         value: false
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        fromService:
+          type: web
+          property: port
+      
+      # AI Service Keys (Set in Render Dashboard)
       - key: GOOGLE_AI_API_KEY
-        sync: false  # Set in Render dashboard for security
-      - key: KLING_API_ACCESS_KEY
-        sync: false  # Set in Render dashboard for security
+        sync: false
+      - key: KLING_API_ACCESS_KEY 
+        sync: false
       - key: KLING_API_SECRET_KEY
-        sync: false  # Set in Render dashboard for security
+        sync: false
+      
+      # Database Connection
       - key: DATABASE_URL
         fromDatabase:
           name: ai-video-db
           property: connectionString
+      
+      # Redis Connection
       - key: REDIS_URL
         fromService:
           type: redis
           name: ai-video-redis
           property: connectionString
+      
+      # Security
       - key: SECRET_KEY
-        generateValue: true  # Render will generate a secure random string
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 30
+    
+    # Storage & Performance
     disk:
-      name: video-storage
-      mountPath: /app/outputs
-      sizeGB: 10  # Adjust based on your needs
+      name: ai-video-storage
+      mountPath: /opt/render/project/src/outputs
+      sizeGB: 20
+    
+    # Health Monitoring
     healthCheckPath: /health
-    autoDeploy: true  # Auto deploy on git push
+    autoDeploy: true
+    
+    # Scaling Configuration
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetCPUPercent: 70
+      targetMemoryPercent: 80
 
-  # Background Worker - Celery for async video processing
+  # Background Worker Service
   - type: worker
     name: ai-video-worker
-    runtime: docker
+    runtime: python3
     repo: https://github.com/djyalu/ai_video_creator
     branch: main
-    dockerfilePath: ./ai_video_creator/Dockerfile
-    dockerContext: ./ai_video_creator
-    dockerCommand: celery -A app.worker worker --loglevel=info
+    rootDir: ai_video_creator
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install celery[redis]
+    startCommand: celery -A app.worker worker --loglevel=info --concurrency=2
+    
+    # Shared Environment Variables
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -63,19 +106,42 @@ services:
           type: redis
           name: ai-video-redis
           property: connectionString
+    
+    # Worker Configuration
     disk:
       name: worker-storage
-      mountPath: /app/outputs
-      sizeGB: 10
+      mountPath: /opt/render/project/src/outputs
+      sizeGB: 15
+    
+    scaling:
+      minInstances: 1
+      maxInstances: 2
 
+# Database Services
 databases:
   - name: ai-video-db
     databaseName: ai_video_creator
-    plan: starter  # Free tier, upgrade as needed
-
-# Redis for task queue
+    plan: starter
+    region: singapore
+    user: ai_video_user
+    
+# Additional Services
 services:
+  # Redis Cache & Task Queue
   - type: redis
     name: ai-video-redis
-    plan: starter  # Free tier
+    plan: starter
+    region: singapore
     maxmemoryPolicy: allkeys-lru
+    
+  # Static File Service (Optional)
+  - type: static
+    name: ai-video-docs
+    staticPublishPath: ./docs/_site
+    buildCommand: |
+      pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+      mkdocs build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

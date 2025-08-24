@@ -42,14 +42,71 @@ class VideoGenerator:
         Returns:
             Dict containing job_id and initial status
         """
-        # TODO(human): Implement the video generation logic here
-        # This should:
-        # 1. Enhance the prompt using Google AI
-        # 2. Create a database job entry with status 'processing'
-        # 3. Call Kling AI to generate the video
-        # 4. Handle errors and update job status accordingly
-        # 5. Return job information for status tracking
-        pass
+        try:
+            # Step 1: Enhance prompt using Google AI
+            logger.info(f"Enhancing prompt for user {user_id}: {prompt[:50]}...")
+            enhanced_prompt = await self.google_client.enhance_prompt(
+                prompt=prompt,
+                context="text-to-video"
+            )
+            
+            # Step 2: Create database job entry
+            job = await VideoJob.create(
+                user_id=user_id,
+                input_type="text",
+                input_data={
+                    "original_prompt": prompt,
+                    "enhanced_prompt": enhanced_prompt,
+                    "style_params": style_params or {}
+                },
+                status=JobStatus.PROCESSING
+            )
+            
+            logger.info(f"Created job {job.id} for user {user_id}")
+            
+            # Step 3: Generate video with Kling AI
+            kling_response = await self.kling_client.text_to_video(
+                prompt=enhanced_prompt,
+                duration=style_params.get("duration") if style_params else None,
+                aspect_ratio=style_params.get("aspect_ratio") if style_params else None,
+                style=style_params.get("style") if style_params else None
+            )
+            
+            # Step 4: Update job with Kling AI job ID and start polling
+            await job.update(
+                output_data={
+                    "kling_job_id": kling_response["job_id"],
+                    "estimated_time": kling_response.get("estimated_time", 120)
+                }
+            )
+            
+            # Step 5: Start background polling (in real app, this would be a Celery task)
+            # For now, we'll return the job info immediately
+            
+            return {
+                "job_id": job.id,
+                "status": "processing",
+                "message": "Video generation started successfully",
+                "estimated_time": kling_response.get("estimated_time", 120)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in text-to-video generation: {str(e)}")
+            
+            # Update job status if job was created
+            if 'job' in locals() and job:
+                await job.update(
+                    status=JobStatus.FAILED,
+                    error_message=str(e)
+                )
+                return {
+                    "job_id": job.id,
+                    "status": "failed",
+                    "message": f"Video generation failed: {str(e)}"
+                }
+            
+            # If job wasn't created, raise the exception
+            raise
     
     async def generate_from_image(
         self,

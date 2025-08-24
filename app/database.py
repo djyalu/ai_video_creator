@@ -31,6 +31,10 @@ async def init_db():
         raise
 
 
+# Export SessionLocal for direct use in models
+__all__ = ['Base', 'SessionLocal', 'engine', 'init_db', 'get_db']
+
+
 def get_db():
     """Dependency to get database session"""
     db = SessionLocal()

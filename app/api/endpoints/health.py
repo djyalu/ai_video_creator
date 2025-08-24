@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from typing import Dict, Any
 import time
 import sys
-from ...core.config import settings
+from app.core.config import settings
 
 router = APIRouter()
 
