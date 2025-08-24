@@ -36,7 +36,7 @@ RUN pip install --no-cache-dir --timeout=300 -r requirements.txt || \
      pip install --no-cache-dir -r requirements.txt)
 
 # Verify critical dependencies are installed
-RUN python -c "import psycopg2; import redis; import celery; print('✓ All critical dependencies installed')"
+RUN python -c "import psycopg2; import redis; import celery; import fastapi; import uvicorn; print('✓ All critical production dependencies installed')"
 
 # Production stage
 FROM python:3.12-slim
