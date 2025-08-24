@@ -1,0 +1,74 @@
+services:
+  # Web Service - FastAPI Application
+  - type: web
+    name: ai-video-creator-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: GOOGLE_AI_API_KEY
+        sync: false  # Set in Render dashboard for security
+      - key: KLING_API_ACCESS_KEY
+        sync: false  # Set in Render dashboard for security
+      - key: KLING_API_SECRET_KEY
+        sync: false  # Set in Render dashboard for security
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-video-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-video-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true  # Render will generate a secure random string
+    disk:
+      name: video-storage
+      mountPath: /app/outputs
+      sizeGB: 10  # Adjust based on your needs
+    healthCheckPath: /health
+    autoDeploy: true  # Auto deploy on git push
+
+  # Background Worker - Celery for async video processing
+  - type: worker
+    name: ai-video-worker
+    runtime: docker
+    dockerCommand: celery -A app.worker worker --loglevel=info
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: KLING_API_ACCESS_KEY
+        sync: false
+      - key: KLING_API_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-video-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ai-video-redis
+          property: connectionString
+    disk:
+      name: worker-storage
+      mountPath: /app/outputs
+      sizeGB: 10
+
+databases:
+  - name: ai-video-db
+    databaseName: ai_video_creator
+    plan: starter  # Free tier, upgrade as needed
+
+# Redis for task queue
+services:
+  - type: redis
+    name: ai-video-redis
+    plan: starter  # Free tier
+    maxmemoryPolicy: allkeys-lru
