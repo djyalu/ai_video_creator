@@ -1,0 +1,144 @@
+site_name: AI Video Creator Documentation
+site_description: Comprehensive documentation for the AI Video Creator platform
+site_author: AI Video Creator Team
+site_url: https://djyalu.github.io/ai_video_creator
+
+# Repository
+repo_name: djyalu/ai_video_creator
+repo_url: https://github.com/djyalu/ai_video_creator
+edit_uri: edit/main/docs/
+
+# Configuration
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - toc.follow
+    - navigation.top
+    - search.highlight
+    - search.share
+    - header.autohide
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - tables
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: djyalu
+      repo: ai_video_creator
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - mermaid2:
+      arguments:
+        theme: auto
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quick-start.md
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+  - API Reference:
+    - Overview: api/overview.md
+    - Authentication: api/authentication.md
+    - Video Generation: api/video-generation.md
+    - Job Management: api/job-management.md
+    - Error Handling: api/error-handling.md
+  - Architecture:
+    - System Overview: architecture/overview.md
+    - Database Design: architecture/database.md
+    - AI Integration: architecture/ai-services.md
+    - Deployment: architecture/deployment.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+    - CI/CD: development/cicd.md
+  - Deployment:
+    - Render.com: deployment/render.md
+    - Docker: deployment/docker.md
+    - Environment Variables: deployment/environment.md
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/djyalu/ai_video_creator
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/djyalu/ai_video_creator
+  
+  version:
+    provider: mike
+    default: stable
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js

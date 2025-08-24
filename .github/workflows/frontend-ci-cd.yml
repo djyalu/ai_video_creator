@@ -1,0 +1,201 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci-cd.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci-cd.yml'
+
+jobs:
+  test:
+    name: 🧪 Test Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📥 Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🔍 TypeScript type check
+      working-directory: ./frontend
+      run: npm run type-check
+
+    - name: 🎨 Lint code
+      working-directory: ./frontend
+      run: npm run lint
+
+    - name: 🏗️ Build application
+      working-directory: ./frontend
+      run: npm run build
+
+    - name: 📤 Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 5
+
+  e2e-test:
+    name: 🎭 E2E Tests
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📥 Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🎭 Install Playwright browsers
+      working-directory: ./frontend
+      run: npx playwright install --with-deps
+
+    - name: 🧪 Run E2E tests
+      working-directory: ./frontend
+      run: npm run test
+      env:
+        PLAYWRIGHT_BASE_URL: http://localhost:3000
+
+    - name: 📤 Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-results
+        path: frontend/test-results/
+        retention-days: 7
+
+    - name: 📤 Upload HTML report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-html-report
+        path: frontend/test-results/html-report/
+        retention-days: 7
+
+  deploy:
+    name: 🚀 Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [test, e2e-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 📦 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: 📥 Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: 🏗️ Build for production
+      working-directory: ./frontend
+      run: npm run build
+      env:
+        NODE_ENV: production
+
+    - name: 📄 Setup GitHub Pages
+      uses: actions/configure-pages@v4
+
+    - name: 📤 Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: frontend/dist/
+
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+  lighthouse:
+    name: 🏠 Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🏠 Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        urls: |
+          https://djyalu.github.io/ai_video_creator/
+        budgetPath: frontend/.lighthouserc.json
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+
+  notify:
+    name: 📢 Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy, lighthouse]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: 📢 Create deployment summary
+      run: |
+        echo "## 🎬 AI Video Creator Frontend Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Deployment Status" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ **Successfully deployed to GitHub Pages**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Live URL:** https://djyalu.github.io/ai_video_creator/" >> $GITHUB_STEP_SUMMARY
+          echo "📖 **API Docs:** https://ai-video-creator-irf1.onrender.com/docs" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Deployment failed**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "- Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- E2E Tests: ${{ needs.e2e-test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Deployment: ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Lighthouse: ${{ needs.lighthouse.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Features Available" >> $GITHUB_STEP_SUMMARY
+        echo "- ✨ Text-to-Video Generation" >> $GITHUB_STEP_SUMMARY
+        echo "- 🖼️ Image-to-Video Animation" >> $GITHUB_STEP_SUMMARY
+        echo "- 📊 Real-time Job Status Tracking" >> $GITHUB_STEP_SUMMARY
+        echo "- 📱 Responsive Design" >> $GITHUB_STEP_SUMMARY
+        echo "- 🧪 Comprehensive E2E Testing" >> $GITHUB_STEP_SUMMARY
