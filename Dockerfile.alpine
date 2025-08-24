@@ -20,10 +20,13 @@ RUN apk add --no-cache \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-# First install setuptools and wheel to avoid build issues
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies in multiple steps for better error handling
+# Step 1: Ensure pip, setuptools, and wheel are up to date
+RUN python -m pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --upgrade setuptools wheel
+
+# Step 2: Install requirements
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Production stage
 FROM python:3.12-alpine

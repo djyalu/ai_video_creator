@@ -8,6 +8,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    python3-dev \
+    build-essential \
     ffmpeg \
     libsm6 \
     libxext6 \
@@ -21,10 +23,13 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-# First install setuptools and wheel to avoid build issues
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies in multiple steps for better error handling
+# Step 1: Ensure pip, setuptools, and wheel are up to date
+RUN python -m pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --upgrade setuptools wheel
+
+# Step 2: Install requirements
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Verify critical dependencies are installed
 RUN python -c "import psycopg2; import redis; import celery; print('✓ All critical dependencies installed')"
