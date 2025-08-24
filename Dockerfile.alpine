@@ -1,22 +1,21 @@
-# Multi-stage build for optimized image size
-FROM python:3.13-slim as builder
+# Alternative Alpine-based Dockerfile for smaller image size
+FROM python:3.13-alpine as builder
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for video processing and PostgreSQL
-RUN apt-get update && apt-get install -y \
+# Install build dependencies for Alpine
+RUN apk add --no-cache \
     gcc \
     g++ \
+    musl-dev \
+    postgresql-dev \
+    linux-headers \
+    jpeg-dev \
+    zlib-dev \
     ffmpeg \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    wget \
-    libpq-dev \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+    libffi-dev \
+    openssl-dev
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -25,23 +24,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Verify critical dependencies are installed
-RUN python -c "import psycopg2; import redis; import celery; print('✓ All critical dependencies installed')"
-
 # Production stage
-FROM python:3.13-slim
+FROM python:3.13-alpine
 
 WORKDIR /app
 
 # Install runtime dependencies only
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     ffmpeg \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    libpq5 \
-    && rm -rf /var/lib/apt/lists/*
+    postgresql-libs \
+    jpeg \
+    zlib \
+    libffi \
+    openssl
 
 # Copy Python packages from builder
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
@@ -54,7 +49,7 @@ COPY . .
 RUN mkdir -p uploads outputs temp logs
 
 # Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
+RUN adduser -D -u 1000 appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
