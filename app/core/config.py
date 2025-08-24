@@ -18,12 +18,12 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False)
     
     # Google AI Studio
-    GOOGLE_AI_API_KEY: str = Field(..., description="Google AI Studio API Key")
+    GOOGLE_AI_API_KEY: Optional[str] = Field(default=None, description="Google AI Studio API Key")
     GOOGLE_PROJECT_NUMBER: Optional[str] = Field(default=None)
     
     # Kling AI
-    KLING_API_ACCESS_KEY: str = Field(..., description="Kling AI Access Key")
-    KLING_API_SECRET_KEY: str = Field(..., description="Kling AI Secret Key")
+    KLING_API_ACCESS_KEY: Optional[str] = Field(default=None, description="Kling AI Access Key")
+    KLING_API_SECRET_KEY: Optional[str] = Field(default=None, description="Kling AI Secret Key")
     KLING_API_BASE_URL: str = Field(default="https://api.klingai.com/v1")
     
     # Database
