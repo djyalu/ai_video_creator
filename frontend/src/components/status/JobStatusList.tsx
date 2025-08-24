@@ -9,7 +9,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 const JobStatusList: React.FC = () => {
   const {
     jobs,
-    activeJobs,
     currentUser,
     loadUserJobs,
     isLoading,

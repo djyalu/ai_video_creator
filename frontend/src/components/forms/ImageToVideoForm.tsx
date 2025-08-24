@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { Play, Image, Loader2, AlertCircle, Upload, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Image, Loader2, AlertCircle, Upload } from 'lucide-react';
 import { useVideoStore } from '../../stores/videoStore';
 import { motion } from 'framer-motion';
-import { useDropzone } from 'react-dropzone';
 
 const ImageToVideoForm: React.FC = () => {
   const {
@@ -15,7 +14,7 @@ const ImageToVideoForm: React.FC = () => {
   } = useVideoStore();
 
   const [localError, setLocalError] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [_imagePreview, _setImagePreview] = useState<string | null>(null);
 
   // TODO(human): Implement drag-and-drop image upload functionality
   // This should handle file validation, preview display, and proper error states
@@ -57,7 +56,7 @@ const ImageToVideoForm: React.FC = () => {
   const handleReset = () => {
     resetImageForm();
     setLocalError(null);
-    setImagePreview(null);
+    _setImagePreview(null);
   };
 
   const displayError = localError || error;
