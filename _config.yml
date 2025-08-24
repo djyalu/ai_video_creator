@@ -1,0 +1,38 @@
+# GitHub Pages configuration for AI Video Creator
+title: "AI Video Creator"
+description: "Transform text prompts and images into stunning videos using AI"
+url: "https://djyalu.github.io"
+baseurl: "/ai_video_creator"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+plugins:
+  - jekyll-sitemap
+  - jekyll-feed
+
+# Exclude files from processing
+exclude:
+  - frontend/node_modules/
+  - ai_video_creator/
+  - scripts/
+  - "*.py"
+  - requirements.txt
+  - docker-compose.yml
+  - Dockerfile
+  - .env.example
+  - "*.md"
+
+# Include additional files
+include:
+  - _headers
+  - _redirects
+
+# Site navigation
+navigation:
+  - title: "Live Demo"
+    url: "/"
+  - title: "API Docs"
+    url: "https://ai-video-creator-irf1.onrender.com/docs"
+  - title: "GitHub"
+    url: "https://github.com/djyalu/ai_video_creator"
