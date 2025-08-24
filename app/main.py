@@ -102,6 +102,25 @@ async def root():
     }
 
 
+@app.get("/ping")
+async def standalone_health_check():
+    """
+    Standalone health check without external dependencies
+    Perfect for load balancers and monitoring systems
+    """
+    import sys
+    import time
+    
+    return {
+        "status": "alive",
+        "timestamp": int(time.time()),
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "app_name": settings.APP_NAME,
+        "environment": settings.ENVIRONMENT,
+        "message": "Service is running"
+    }
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
