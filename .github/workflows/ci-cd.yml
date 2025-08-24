@@ -1,0 +1,256 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: 3.12
+  NODE_VERSION: 18
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          ffmpeg \
+          libsm6 \
+          libxext6 \
+          libxrender-dev \
+          libgomp1 \
+          postgresql-client
+
+    - name: Install Python dependencies
+      run: |
+        cd ai_video_creator
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Create test environment file
+      run: |
+        cd ai_video_creator
+        cat > .env.test << EOF
+        ENVIRONMENT=test
+        DEBUG=true
+        DATABASE_URL=postgresql://test_user:test_password@localhost:5432/test_db
+        REDIS_URL=redis://localhost:6379/0
+        SECRET_KEY=test-secret-key-for-ci
+        GOOGLE_AI_API_KEY=test-key
+        KLING_API_ACCESS_KEY=test-access-key
+        KLING_API_SECRET_KEY=test-secret-key
+        EOF
+
+    - name: Run database migrations
+      run: |
+        cd ai_video_creator
+        python -c "
+        import asyncio
+        from app.database import init_db, engine
+        from app.models import VideoJob
+        asyncio.run(init_db())
+        print('✅ Database initialized')
+        "
+      env:
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+
+    - name: Run tests
+      run: |
+        cd ai_video_creator
+        python -m pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
+      env:
+        ENVIRONMENT: test
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379/0
+
+    - name: Run linting
+      run: |
+        cd ai_video_creator
+        black --check --diff app/
+        isort --check-only --diff app/
+        flake8 app/ --max-line-length=100 --extend-ignore=E203,W503
+        mypy app/ --ignore-missing-imports
+
+    - name: Security scan
+      run: |
+        cd ai_video_creator
+        pip install bandit safety
+        bandit -r app/ -f json -o bandit-report.json
+        safety check --json --output safety-report.json || true
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          ai_video_creator/htmlcov/
+          ai_video_creator/coverage.xml
+          ai_video_creator/bandit-report.json
+          ai_video_creator/safety-report.json
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Build application
+      run: |
+        cd ai_video_creator
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        python -c "import app.main; print('✅ Application builds successfully')"
+
+    - name: Deploy to Render
+      if: success()
+      run: |
+        echo "🚀 Deployment triggered by push to main branch"
+        echo "Render will automatically deploy from GitHub"
+        echo "Monitor deployment at: https://dashboard.render.com"
+
+    - name: Health check after deployment
+      if: success()
+      run: |
+        echo "⏳ Waiting for deployment to be ready..."
+        sleep 60
+        # Add health check URL when known
+        # curl -f https://your-app.onrender.com/health || exit 1
+
+  documentation:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install documentation dependencies
+      run: |
+        pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+        pip install -r ai_video_creator/requirements.txt
+
+    - name: Generate API documentation
+      run: |
+        cd ai_video_creator
+        python -c "
+        from app.main import app
+        import json
+        schema = app.openapi()
+        with open('../docs/api-schema.json', 'w') as f:
+            json.dump(schema, f, indent=2)
+        print('✅ API schema generated')
+        "
+
+    - name: Build documentation
+      run: |
+        mkdocs build --site-dir _site
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./_site
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: '📚 Update documentation'
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: python
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+  performance-test:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        cd ai_video_creator
+        pip install -r requirements.txt
+        pip install locust
+
+    - name: Run performance tests
+      run: |
+        cd ai_video_creator
+        # Add performance tests when ready
+        echo "🚀 Performance tests will be added in future iterations"
